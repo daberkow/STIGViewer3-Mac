@@ -92,14 +92,7 @@ file "$SQLITE_DEST/node_sqlite3.node" | grep -q 'Mach-O.*arm64' || {
 ICON_ICNS=""
 ICON_SRC="./src/assets/ag_icon.ico"
 
-if [[ -f "$REPO_ROOT/icon.icns" ]]; then
-  # A hand-authored icon wins: it carries real artwork at every size, whereas the
-  # generated one upscales a 256x256 master. Keep it out of git; drop it in
-  # locally, or have CI materialise it before the build.
-  echo "Using supplied icon.icns from $REPO_ROOT"
-  cp "$REPO_ROOT/icon.icns" ./src/assets/icon.icns
-  ICON_ICNS="./src/assets/icon.icns"
-elif [[ "$(uname)" == "Darwin" && -f "$ICON_SRC" ]]; then
+if [[ "$(uname)" == "Darwin" && -f "$ICON_SRC" ]]; then
   python3 - "$ICON_SRC" ./icon_master.png <<'PYICON'
 import struct, sys
 src, dst = sys.argv[1], sys.argv[2]
@@ -142,7 +135,7 @@ SIZES
   [[ -f ./src/assets/icon.icns ]] || { echo "icns generation failed" >&2; exit 1; }
   ICON_ICNS="./src/assets/icon.icns"
 else
-  echo "No icon.icns supplied and no source at $ICON_SRC (or not on macOS) - building without a custom icon" >&2
+  echo "No icon source at $ICON_SRC (or not on macOS) - building without a custom icon" >&2
 fi
 
 # Reference the icon only when it exists. maker-dmg treats a missing config.icon
