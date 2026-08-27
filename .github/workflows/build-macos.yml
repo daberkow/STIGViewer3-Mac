@@ -25,7 +25,20 @@ jobs:
         with:
           node-version: "22"
 
+      # node-gyp 9.x (bundled in the app's dependency tree) imports distutils,
+      # which Python removed in 3.12. The runner's default is much newer, so pin
+      # 3.11 - the last version that still ships distutils - for native builds.
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: "3.11"
+
       - name: Build macOS bundles
+        env:
+          # Set explicitly rather than relying on PATH order: node-gyp prefers
+          # npm_config_python/PYTHON over whatever python3 it finds.
+          PYTHON: ${{ steps.python.outputs.python-path }}
+          npm_config_python: ${{ steps.python.outputs.python-path }}
         run: ./bundle.sh
 
       - name: Read detected version
