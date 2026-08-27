@@ -7,7 +7,7 @@ CATALOG_API='https://www.cyber.mil/webruntime/api/apex/execute?language=en-US&as
 SQLITE="https://github.com/TryGhost/node-sqlite3/releases/download/v5.1.7/sqlite3-v5.1.7-napi-v3-darwin-arm64.tar.gz"
 
 # Dependencies
-for dep in curl jq; do
+for dep in curl jq unzip tar file python3; do
   command -v "$dep" >/dev/null || { echo "Missing dependency: $dep" >&2; exit 1; }
 done
 
@@ -82,8 +82,82 @@ file "$SQLITE_DEST/node_sqlite3.node" | grep -q 'Mach-O.*arm64' || {
   echo "sqlite3 arm64 binary failed verification - got: $(file "$SQLITE_DEST/node_sqlite3.node")" >&2
   exit 1
 }
-# cp ../../../../icon.icns ./src/assets/
 
+
+# Icon
+# Upstream ships only .ico art and this repo deliberately holds no binary assets,
+# so build the .icns at packaging time. The 256x256 entry inside ag_icon.ico is
+# stored as a raw PNG, which makes it a byte-slice away; sips and iconutil are
+# both macOS built-ins, so no extra tooling is needed.
+ICON_ICNS=""
+ICON_SRC="./src/assets/ag_icon.ico"
+
+if [[ -f "$REPO_ROOT/icon.icns" ]]; then
+  # A hand-authored icon wins: it carries real artwork at every size, whereas the
+  # generated one upscales a 256x256 master. Keep it out of git; drop it in
+  # locally, or have CI materialise it before the build.
+  echo "Using supplied icon.icns from $REPO_ROOT"
+  cp "$REPO_ROOT/icon.icns" ./src/assets/icon.icns
+  ICON_ICNS="./src/assets/icon.icns"
+elif [[ "$(uname)" == "Darwin" && -f "$ICON_SRC" ]]; then
+  python3 - "$ICON_SRC" ./icon_master.png <<'PYICON'
+import struct, sys
+src, dst = sys.argv[1], sys.argv[2]
+d = open(src, 'rb').read()
+_, _, n = struct.unpack('<HHH', d[:6])
+best = None
+for i in range(n):
+    w, h, _c, _r, _p, _b, size, off = struct.unpack('<BBBBHHII', d[6 + i*16 : 22 + i*16])
+    w = w or 256
+    if d[off:off+4] == b'\x89PNG' and (best is None or w > best[0]):
+        best = (w, off, size)
+if best is None:
+    sys.exit("no PNG-encoded entry found in %s" % src)
+open(dst, 'wb').write(d[best[1] : best[1] + best[2]])
+print("extracted %dx%d master icon" % (best[0], best[0]))
+PYICON
+
+  rm -rf ./icon.iconset
+  mkdir ./icon.iconset
+  while read -r px name; do
+    [[ -n "$px" ]] || continue
+    # </dev/null so sips cannot consume the heredoc feeding this loop
+    sips -z "$px" "$px" ./icon_master.png --out "./icon.iconset/${name}.png" >/dev/null </dev/null
+  done <<'SIZES'
+16 icon_16x16
+32 icon_16x16@2x
+32 icon_32x32
+64 icon_32x32@2x
+128 icon_128x128
+256 icon_128x128@2x
+256 icon_256x256
+512 icon_256x256@2x
+512 icon_512x512
+1024 icon_512x512@2x
+SIZES
+
+  iconutil -c icns ./icon.iconset -o ./src/assets/icon.icns
+  rm -rf ./icon.iconset ./icon_master.png
+
+  [[ -f ./src/assets/icon.icns ]] || { echo "icns generation failed" >&2; exit 1; }
+  ICON_ICNS="./src/assets/icon.icns"
+else
+  echo "No icon.icns supplied and no source at $ICON_SRC (or not on macOS) - building without a custom icon" >&2
+fi
+
+# Reference the icon only when it exists. maker-dmg treats a missing config.icon
+# as fatal, unlike packagerConfig.icon which only warns.
+if [[ -n "$ICON_ICNS" ]]; then
+  PACKAGER_ICON='
+        "icon": "'"$ICON_ICNS"'",'
+  DMG_ICON=',
+          "config": {
+            "icon": "'"$ICON_ICNS"'"
+          }'
+else
+  PACKAGER_ICON=''
+  DMG_ICON=''
+fi
 
 # Package
 # Signing is opt-in: SIGN=1 requires a Developer ID identity in the keychain.
@@ -97,17 +171,13 @@ fi
 
 REPLACEMENT_TEXT='"config": {
     "forge": {
-      "packagerConfig": {
-        "icon": "./src/assets/icon.icns",
+      "packagerConfig": {'"$PACKAGER_ICON"'
         "name": "Stig Viewer 3"'"$OSX_SIGN"'
       },
 
       "makers": [
         {
-          "name": "@electron-forge/maker-dmg",
-          "config": {
-            "icon": "./src/assets/icon.icns"
-          }
+          "name": "@electron-forge/maker-dmg"'"$DMG_ICON"'
         },
         {
           "name": "@electron-forge/maker-zip",
