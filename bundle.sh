@@ -61,6 +61,18 @@ cd ./stig_viewer/stig_viewer_3*/resources/
 npx --yes @electron/asar@4.3.0 extract app.asar unpacked_stig_viewer/
 cd unpacked_stig_viewer
 npm install --legacy-peer-deps
+# electron-installer-dmg declares appdmg as an "os": "darwin" optionalDependency.
+# The lockfile inside the asar was generated on Linux, where npm skipped it, and
+# npm will not re-add a skipped optional dep when installing on another platform.
+# Install it explicitly so maker-dmg can find it.
+if [[ "$(uname)" == "Darwin" ]]; then
+  npm install --no-save --legacy-peer-deps appdmg@^0.6.6
+  node -e "require.resolve('appdmg')" || {
+    echo "appdmg still not resolvable - the dmg maker will fail" >&2
+    exit 1
+  }
+fi
+
 # sqlite3-offline-next ships a working darwin-x64 binary but omits darwin-arm64,
 # so only arm64 needs to be supplied here.
 SQLITE_DEST="./node_modules/sqlite3-offline-next/binaries/sqlite3-darwin/napi-v3-darwin-arm64"
