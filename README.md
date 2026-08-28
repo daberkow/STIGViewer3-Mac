@@ -2,6 +2,7 @@
 A repackaging of STIG Viewer 3 for Linux with needed Mac dependencies. The app is a Node.JS native app, and is just missing a sqlite driver. The app is signed and notarized to open on a Mac.
 
 Releases are in the [repo](https://github.com/daberkow/STIGViewer3-Mac/releases)!
+Tested on: Tahoe 26.6
 
 ![Screenshot](./screenshot.png)
 
