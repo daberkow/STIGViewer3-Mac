@@ -4,7 +4,7 @@ A repackaging of STIG Viewer 3 for Linux with needed Mac dependencies. The app i
 ![Screenshot](./screenshot.png)
 
 > [!WARNING]
-> I am making no claim to rights to the application, I could not find a LICENSE file other than the default Node license for the application, and I wanted to help those who need STIG Viewer 3 on the Mac. I hope this helps build an official Mac version.
+> I am making no claim to rights to the application, I could not find a LICENSE file other than the default Node license for the application, and I wanted to help those who need STIG Viewer 3 on the Mac. I hope this helps build an official Mac version. This repo contains no files from STIG Viewer, it just manipulates the Linux install in Github Actions.
 
 Releases are in the [repo](https://github.com/daberkow/STIGViewer3-Mac/releases)!
 
